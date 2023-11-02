@@ -1,4 +1,13 @@
-import { createCartLine, showCartContent } from './lib/ui.js';
+import { formatNumber } from './lib/helpers.js';
+import { createCartLine, showCartContent, } from './lib/ui.js';
+
+/**
+ * @typedef {Object} Product
+ * @property {number} id Auðkenni vöru, jákvæð heiltala stærri en 0.
+ * @property {string} title Titill vöru, ekki tómur strengur.
+ * @property {string} description Lýsing á vöru, ekki tómur strengur.
+ * @property {number} price Verð á vöru, jákvæð heiltala stærri en 0.
+ */
 
 const products = [
   {
@@ -22,22 +31,53 @@ const products = [
   },
 ];
 
-/** Bæta vöru í körfu */
+/** 
+ * Bæta vöru í körfu 
+ * @param {Product} product
+ * @param {number} quantity
+*/
 function addProductToCart(product, quantity) {
   // Hér þarf að finna `<tbody>` í töflu og setja `cartLine` inn í það
-  const cart = document.querySelector('.cart-content');
+  const cartTableBodyElement = document.querySelector('.cart table tbody');
 
-  if (!cart) {
-    console.warn('fann ekki .cart');
+  if (!cartTableBodyElement) {
+    console.warn('fann ekki .cart table');
+    return;
+  }
+
+  const cartlist = getCartList();
+  const cart = document.querySelector('.cart');
+
+  //smá subbulegt hérna f neðan :-)))
+
+  if (cartlist.includes(product.id)) {
+    const index = cartlist.indexOf(product.id);
+    const tbody = cart.querySelector('tbody');
+    const cartTr = tbody.querySelectorAll('tr')[index];
+    const cartTd = cartTr.querySelector('td:nth-child(2)');
+    const currentNumberOfItems = Number(cartTd.textContent); // Convert the content to a number
+    const newNumberOfItems = currentNumberOfItems + Number(quantity);
+    cartTd.textContent = newNumberOfItems.toString();
+    const carttotal = cartTr.querySelector('td:nth-child(4)');
+    const itemprice = cartTr.querySelector('td:nth-child(3)');
+    const carttotalnum = (stringtonum(carttotal.textContent))
+    const itempricenum = (stringtonum(itemprice.textContent))
+    const newtotal = itempricenum * newNumberOfItems
+    carttotal.textContent = formatNumber(newtotal);
+    updatetotal()
+    
     return;
   }
   
   // TODO hér þarf að athuga hvort lína fyrir vöruna sé þegar til
   const cartLine = createCartLine(product, quantity);
-  cart.appendChild(cartLine);
+  cartTableBodyElement.appendChild(cartLine);
 
   // Sýna efni körfu
   showCartContent(true);
+  updatetotal()
+
+
 
   // TODO sýna/uppfæra samtölu körfu
 }
@@ -55,9 +95,21 @@ function submitHandler(event) {
   // Finnum vöru með þessu productId
   const product = products.find((i) => i.id === productId);
 
+  if (!product) {
+    return;
+  }
+
   // TODO hér þarf að finna fjölda sem á að bæta við körfu með því að athuga
   // á input
-  const quantity = 1;
+  //const quantity = 1;
+  const form = event.target.closest('form');
+  const inputField = form.querySelector('input[type="number"]');
+
+  let quantity = inputField.value;
+
+  inputField.addEventListener('input', function() {
+    quantity = inputField.value;
+});
 
   // Bætum vöru í körfu (hér væri gott að bæta við athugun á því að varan sé til)
   addProductToCart(product, quantity);
@@ -72,4 +124,69 @@ for (const form of Array.from(addToCartForms)) {
   form.addEventListener('submit', submitHandler);
 }
 
+
+function getCartList() {
+  const cart = document.querySelector('.cart');
+  const trElements = cart.querySelectorAll('tr[data-product-id]');
+  const productIdList = Array.from(trElements).map((element) => Number(element.getAttribute('data-product-id')));
+  return productIdList;
+
+}
+
+function stringtonum(currencyString) {
+  if (typeof currencyString === 'string') {
+    const stringWithoutCurrency = currencyString.replace(/[^\d]/g, '');
+    const numberValue = parseInt(stringWithoutCurrency, 10);
+    return numberValue;
+  } else {
+    return;
+  }
+  
+}
+
+export function updatetotal() {
+  const cart = document.querySelector('.cart');
+  const tbody = cart.querySelector('tbody');
+  const trElements = tbody.querySelectorAll('tr');
+  let total = 0;
+
+  for (let i = 0; i < trElements.length; i++) {
+    const tr = trElements[i];
+    const tdElements = tr.querySelectorAll('td');
+    const fourthTd = tdElements[3];
+
+    if (fourthTd) {
+      const fourthtdstring = fourthTd.textContent;
+      if (typeof fourthtdstring !== 'string') {
+        return;
+
+      }
+      const value = stringtonum(fourthtdstring);
+      if (!value) {
+        return;
+      }
+      if (!isNaN(value)) {
+        total += value;
+      }
+    }
+  }
+
+
+  const totalRow = document.querySelector('tr.totalprice');
+  const secondTd = totalRow.querySelectorAll('td')[1];
+  secondTd.textContent = formatNumber(total)
+}
 // TODO bæta við event handler á form sem submittar pöntun
+
+function showMessageAndReload() {
+  // Display a confirmation dialog with "OK" and "Cancel" buttons
+  const userConfirmed = confirm("Do you want to reload the page?");
+  if (userConfirmed) {
+    // User clicked "OK", so reload the page
+    location.reload();
+  }
+}
+
+const specificButton = document.getElementById('checkoutbutton');
+
+specificButton.addEventListener('click', showMessageAndReload)
